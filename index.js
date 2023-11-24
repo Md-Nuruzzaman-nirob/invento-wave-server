@@ -13,10 +13,6 @@ const port = process.env.PORT || 6001;
 app.use(cors())
 app.use(express.json())
 
-app.get('/', (req, res) => {
-    res.send('server is running')
-})
-
 app.listen(port, () => {
     console.log('server running on', port);
 })
@@ -108,10 +104,14 @@ async function run() {
             res.send(result)
         })
 
-        await client.db("admin").command({
-            ping: 1
-        });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({
+        //     ping: 1
+        // });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {}
 }
 run().catch(console.dir);
+
+app.get('/', (req, res) => {
+    res.send('server is running')
+})
