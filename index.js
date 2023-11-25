@@ -4,7 +4,8 @@ const cors = require('cors');
 require('dotenv').config()
 const {
     MongoClient,
-    ServerApiVersion
+    ServerApiVersion,
+    ObjectId
 } = require('mongodb');
 
 const port = process.env.PORT || 6001;
@@ -34,9 +35,19 @@ async function run() {
         // collections
         const usersCollection = client.db('inventoDB').collection('users')
         const shopCollection = client.db('inventoDB').collection('shop')
+        const productsCollection = client.db('inventoDB').collection('products')
 
 
         // >======= user api =======<
+        app.get('/api/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                email: email
+            };
+            const result = await usersCollection.findOne(query);
+            res.send(result)
+        })
+
         app.post('/api/user/create', async (req, res) => {
             const userInfo = req.body
             const result = await usersCollection.insertOne(userInfo)
@@ -87,6 +98,15 @@ async function run() {
 
 
         // >======= shop api =======<
+        app.get('/api/shop/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                email: email
+            };
+            const result = await shopCollection.findOne(query);
+            res.send(result)
+        })
+
         app.post('/api/shop/create', async (req, res) => {
             const email = req.body.email
             const query = {
@@ -104,10 +124,45 @@ async function run() {
             res.send(result)
         })
 
-        // await client.db("admin").command({
-        //     ping: 1
-        // });
-        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // >======= product api =======<
+        app.get('/api/product/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                shopEmail: email,
+            };
+
+            const result = await productsCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.post('/api/product/create', async (req, res) => {
+            const productInfo = req.body
+            const result = await productsCollection.insertOne(productInfo)
+            res.send(result)
+        })
+
+        app.get('/api/product/:email/:id', async (req, res) => {
+            const email = req.params.email;
+            const id = req.params.id;
+            const query = {
+                shopEmail: email,
+                _id: new ObjectId(id)
+            };
+
+            const result = await productsCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.post('/api/product/create', async (req, res) => {
+            const productInfo = req.body
+            const result = await productsCollection.insertOne(productInfo)
+            res.send(result)
+        })
+
+        await client.db("admin").command({
+            ping: 1
+        });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {}
 }
 run().catch(console.dir);
