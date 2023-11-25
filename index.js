@@ -135,12 +135,6 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/api/product/create', async (req, res) => {
-            const productInfo = req.body
-            const result = await productsCollection.insertOne(productInfo)
-            res.send(result)
-        })
-
         app.get('/api/product/:email/:id', async (req, res) => {
             const email = req.params.email;
             const id = req.params.id;
@@ -149,7 +143,7 @@ async function run() {
                 _id: new ObjectId(id)
             };
 
-            const result = await productsCollection.find(query).toArray();
+            const result = await productsCollection.findOne(query);
             res.send(result)
         })
 
@@ -159,10 +153,50 @@ async function run() {
             res.send(result)
         })
 
-        await client.db("admin").command({
-            ping: 1
-        });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+
+        app.patch('/api/product/update/:id', async (req, res) => {
+            const id = req.params.id;
+            const productInfo = req.body;
+            const query = {
+                _id: new ObjectId(id)
+            };
+            const productUpdateInfo = {
+                $set: {
+                    productName: productInfo.productName,
+                    productQuantity: productInfo.productQuantity,
+                    productionCost: productInfo.productionCost,
+                    profitMarginPercent: productInfo.profitMarginPercent,
+                    discountPercent: productInfo.discountPercent,
+                    sellingPrice: productInfo.sellingPrice,
+                    sellCount: productInfo.sellCount,
+                    productImage: productInfo.productImage,
+                    date: productInfo.date,
+                    productLocation: productInfo.productLocation,
+                    description: productInfo.description,
+                    shopEmail: productInfo.shopEmail,
+                    shopId: productInfo.shopId,
+                    shopName: productInfo.shopName,
+                    shopLogo: productInfo.shopLogo,
+                }
+            }
+            const result = await productsCollection.updateOne(query, productUpdateInfo)
+            res.send(result)
+        })
+
+        app.delete('/api/product/update/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = {
+                _id: new ObjectId(id)
+            };
+
+            const result = await productsCollection.deleteOne(query)
+            res.send(result)
+        })
+
+        // await client.db("admin").command({
+        //     ping: 1
+        // });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {}
 }
 run().catch(console.dir);
