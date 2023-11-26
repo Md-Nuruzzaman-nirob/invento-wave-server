@@ -7,11 +7,16 @@ const {
     ServerApiVersion,
     ObjectId
 } = require('mongodb');
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 
 const port = process.env.PORT || 6001;
 
 // middleware
-app.use(cors())
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://invento-wave-server.vercel.app'],
+    credentials: true
+}));
+
 app.use(express.json())
 
 app.listen(port, () => {
@@ -36,6 +41,7 @@ async function run() {
         const usersCollection = client.db('inventoDB').collection('users')
         const shopCollection = client.db('inventoDB').collection('shop')
         const productsCollection = client.db('inventoDB').collection('products')
+        const salesCollection = client.db('inventoDB').collection('sales')
 
 
         // >======= user api =======<
@@ -135,11 +141,9 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/api/product/:email/:id', async (req, res) => {
-            const email = req.params.email;
+        app.get('/api/product/single/:id', async (req, res) => {
             const id = req.params.id;
             const query = {
-                shopEmail: email,
                 _id: new ObjectId(id)
             };
 
@@ -167,16 +171,28 @@ async function run() {
                     productionCost: productInfo.productionCost,
                     profitMarginPercent: productInfo.profitMarginPercent,
                     discountPercent: productInfo.discountPercent,
-                    sellingPrice: productInfo.sellingPrice,
-                    sellCount: productInfo.sellCount,
                     productImage: productInfo.productImage,
-                    date: productInfo.date,
+                    productCode: productInfo.productCode,
                     productLocation: productInfo.productLocation,
                     description: productInfo.description,
-                    shopEmail: productInfo.shopEmail,
-                    shopId: productInfo.shopId,
-                    shopName: productInfo.shopName,
-                    shopLogo: productInfo.shopLogo,
+                    sellingPrice: productInfo.sellingPrice,
+                    lastUpdate: productInfo.lastUpdate,
+                }
+            }
+            const result = await productsCollection.updateOne(query, productUpdateInfo)
+            res.send(result)
+        })
+
+        app.patch('/api/product/update/checkout/:id', async (req, res) => {
+            const id = req.params.id;
+            const productInfo = req.body;
+            const query = {
+                _id: new ObjectId(id)
+            };
+            const productUpdateInfo = {
+                $set: {
+                    productQuantity: productInfo.productQuantity,
+                    sellCount: productInfo.sellCount,
                 }
             }
             const result = await productsCollection.updateOne(query, productUpdateInfo)
@@ -192,6 +208,40 @@ async function run() {
             const result = await productsCollection.deleteOne(query)
             res.send(result)
         })
+
+
+        // >======= payment api =======<
+        app.post('/create-payment-intent', async (req, res) => {
+            try {
+                const {
+                    price
+                } = req.body;
+                const amount = parseInt(price * 100);
+
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: amount,
+                    currency: 'usd',
+                    payment_method_types: ['card'],
+                });
+
+                res.send({
+                    clientSecret: paymentIntent.client_secret
+                });
+            } catch (error) {
+                console.error("Error creating payment intent:", error);
+                res.status(500).send({
+                    error: "Error creating payment intent."
+                });
+            }
+        });
+
+        // >======= sale api =======<
+        app.post('/api/sale/create', async (req, res) => {
+            const productInfo = req.body
+            const result = await salesCollection.insertOne(productInfo)
+            res.send(result)
+        })
+
 
         // await client.db("admin").command({
         //     ping: 1
