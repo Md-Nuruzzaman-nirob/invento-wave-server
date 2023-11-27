@@ -13,7 +13,7 @@ const port = process.env.PORT || 6001;
 
 // middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://invento-wave-server.vercel.app'],
+    origin: ["http://localhost:5173", "http://localhost:5174", "https://invento-wave-server.vercel.app", "https://invento-wave.web.app", "https://invento-wave.firebaseapp.com"],
     credentials: true
 }));
 
@@ -42,9 +42,15 @@ async function run() {
         const shopCollection = client.db('inventoDB').collection('shop')
         const productsCollection = client.db('inventoDB').collection('products')
         const salesCollection = client.db('inventoDB').collection('sales')
+        const paymentsCollection = client.db('inventoDB').collection('payments')
 
 
         // >======= user api =======<
+        app.get('/api/users', async (req, res) => {
+            const result = await usersCollection.find().toArray();
+            res.send(result)
+        })
+
         app.get('/api/user/:email', async (req, res) => {
             const email = req.params.email;
             const query = {
@@ -104,6 +110,11 @@ async function run() {
 
 
         // >======= shop api =======<
+        app.get('/api/shop', async (req, res) => {
+            const result = await shopCollection.find().toArray()
+            res.send(result)
+        })
+
         app.get('/api/shop/:email', async (req, res) => {
             const email = req.params.email;
             const query = {
@@ -130,7 +141,45 @@ async function run() {
             res.send(result)
         })
 
+        app.patch('/api/shop/update/:email', async (req, res) => {
+            const email = req.params.email;
+            const shopInfo = req.body;
+            const query = {
+                email: email
+            };
+
+            const queryResult = await shopCollection.findOne(query);
+            if (!queryResult) {
+                return res.status(404).send({
+                    message: "Shop Not Found"
+                });
+            }
+
+            const productUpdateInfo = {
+                $set: {
+                    limit: queryResult.limit + shopInfo.limit,
+                }
+            }
+            const result = await shopCollection.updateOne(query, productUpdateInfo)
+            res.send(result)
+        })
+
+        app.delete('/api/shop/delete/:email', async (req, res) => {
+            const id = req.params.email;
+            const query = {
+                _id: new ObjectId(id)
+            };
+            const result = await shopCollection.deleteOne(query)
+            res.send(result)
+        })
+
+
         // >======= product api =======<
+        app.get('/api/products', async (req, res) => {
+            const result = await productsCollection.find().toArray();
+            res.send(result)
+        })
+
         app.get('/api/product/:email', async (req, res) => {
             const email = req.params.email;
             const query = {
@@ -141,7 +190,7 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/api/product/single/:id', async (req, res) => {
+        app.get('/api/product/id/:id', async (req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
@@ -210,13 +259,17 @@ async function run() {
         })
 
 
-        // >======= payment api =======<
+        // >======= stripe api =======<
         app.post('/create-payment-intent', async (req, res) => {
             try {
                 const {
                     price
                 } = req.body;
-                const amount = parseInt(price * 100);
+
+                if (price === 0) {
+
+                }
+                const amount = price ? parseInt(price * 100) : 50;
 
                 const paymentIntent = await stripe.paymentIntents.create({
                     amount: amount,
@@ -236,6 +289,22 @@ async function run() {
         });
 
         // >======= sale api =======<
+        app.get('/api/sale', async (req, res) => {
+            const result = await salesCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.get('/api/sale/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                email: email,
+            };
+
+            const result = await salesCollection.find(query).toArray();
+            res.send(result)
+        })
+
+
         app.post('/api/sale/create', async (req, res) => {
             const productInfo = req.body
             const result = await salesCollection.insertOne(productInfo)
@@ -243,10 +312,29 @@ async function run() {
         })
 
 
-        // await client.db("admin").command({
-        //     ping: 1
-        // });
-        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // >======= payment api =======<
+        app.get('/api/payments', async (req, res) => {
+            const result = await paymentsCollection.find().toArray();
+            res.send(result)
+        })
+
+        app.get('/api/payment/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                customerEmail: email,
+            };
+
+            const result = await paymentsCollection.find(query).toArray();
+            res.send(result)
+        })
+
+
+        app.post('/api/payment/create', async (req, res) => {
+            const paymentInfo = req.body
+            const result = await paymentsCollection.insertOne(paymentInfo)
+            res.send(result)
+        })
+
     } finally {}
 }
 run().catch(console.dir);
