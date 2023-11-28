@@ -7,7 +7,9 @@ const {
     ServerApiVersion,
     ObjectId
 } = require('mongodb');
+const jwt = require('jsonwebtoken');
 const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
+
 
 const port = process.env.PORT || 6001;
 
@@ -45,8 +47,57 @@ async function run() {
         const paymentsCollection = client.db('inventoDB').collection('payments')
 
 
+        // >======= api middleware =======<
+        const verifyToken = (req, res, next) => {
+            if (!req.headers.authorization) {
+                return res.status(401).send({
+                    message: 'unauthorized access'
+                })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN, (error, decoded) => {
+                if (error) {
+                    return res.status(401).send({
+                        message: 'unauthorized access'
+                    })
+                } else {
+                    req.decoded = decoded
+                    next()
+                }
+            })
+        }
+
+
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = {
+                email: email
+            }
+
+            const user = await usersCollection.findOne(query)
+
+            if (user.role !== 'System-Admin') {
+                return res.status(403).send({
+                    message: 'forbidden access'
+                })
+            }
+            next()
+        }
+
+
+
+        // >======= jwt token api =======<
+        app.post('/api/jwt/token', async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
+                expiresIn: '6h'
+            })
+            res.send(token)
+        })
+
+
         // >======= user api =======<
-        app.get('/api/users', async (req, res) => {
+        app.get('/api/users', verifyToken, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result)
         })
@@ -110,12 +161,12 @@ async function run() {
 
 
         // >======= shop api =======<
-        app.get('/api/shop', async (req, res) => {
+        app.get('/api/shop', verifyToken, async (req, res) => {
             const result = await shopCollection.find().toArray()
             res.send(result)
         })
 
-        app.get('/api/shop/:email', async (req, res) => {
+        app.get('/api/shop/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = {
                 email: email
@@ -141,7 +192,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/api/shop/update/:email', async (req, res) => {
+        app.patch('/api/shop/update/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const shopInfo = req.body;
             const query = {
@@ -155,16 +206,39 @@ async function run() {
                 });
             }
 
-            const productUpdateInfo = {
+            const updateInfo = {
                 $set: {
-                    limit: queryResult.limit + shopInfo.limit,
+                    limit: queryResult.limit ? queryResult.limit + shopInfo.limit : 0 + shopInfo.limit,
                 }
             }
-            const result = await shopCollection.updateOne(query, productUpdateInfo)
+            const result = await shopCollection.updateOne(query, updateInfo)
             res.send(result)
         })
 
-        app.delete('/api/shop/delete/:email', async (req, res) => {
+        app.patch('/api/shop/update/limit/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            const shopUpdateInfo = req.body;
+            const query = {
+                email: email
+            };
+
+            const queryResult = await shopCollection.findOne(query);
+            if (!queryResult) {
+                return res.status(404).send({
+                    message: "Shop Not Found"
+                });
+            }
+
+            const updateInfo = {
+                $set: {
+                    limit: queryResult.limit - shopUpdateInfo.limit,
+                }
+            }
+            const result = await shopCollection.updateOne(query, updateInfo)
+            res.send(result)
+        })
+
+        app.delete('/api/shop/delete/:email', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.email;
             const query = {
                 _id: new ObjectId(id)
@@ -175,12 +249,12 @@ async function run() {
 
 
         // >======= product api =======<
-        app.get('/api/products', async (req, res) => {
+        app.get('/api/products', verifyToken, async (req, res) => {
             const result = await productsCollection.find().toArray();
             res.send(result)
         })
 
-        app.get('/api/product/:email', async (req, res) => {
+        app.get('/api/product/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = {
                 shopEmail: email,
@@ -190,7 +264,7 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/api/product/id/:id', async (req, res) => {
+        app.get('/api/product/id/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
@@ -207,7 +281,7 @@ async function run() {
         })
 
 
-        app.patch('/api/product/update/:id', async (req, res) => {
+        app.patch('/api/product/update/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const productInfo = req.body;
             const query = {
@@ -232,7 +306,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/api/product/update/checkout/:id', async (req, res) => {
+        app.patch('/api/product/update/checkout/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const productInfo = req.body;
             const query = {
@@ -248,7 +322,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/api/product/update/:id', async (req, res) => {
+        app.delete('/api/product/delete/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
@@ -289,12 +363,12 @@ async function run() {
         });
 
         // >======= sale api =======<
-        app.get('/api/sale', async (req, res) => {
+        app.get('/api/sale', verifyToken, async (req, res) => {
             const result = await salesCollection.find().toArray();
             res.send(result)
         })
 
-        app.get('/api/sale/:email', async (req, res) => {
+        app.get('/api/sale/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = {
                 email: email,
@@ -313,12 +387,12 @@ async function run() {
 
 
         // >======= payment api =======<
-        app.get('/api/payments', async (req, res) => {
+        app.get('/api/payments', verifyToken, async (req, res) => {
             const result = await paymentsCollection.find().toArray();
             res.send(result)
         })
 
-        app.get('/api/payment/:email', async (req, res) => {
+        app.get('/api/payment/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = {
                 customerEmail: email,
