@@ -104,7 +104,7 @@ async function run() {
         // >======= user api =======<
         app.get('/api/users', verifyToken, verifyAdmin, async (req, res) => {
             const skip = parseInt(req.query.skip) || 0
-            const limit = parseInt(req.query.limit) || 2
+            const limit = parseInt(req.query.limit) || 10
 
             const result = await usersCollection.find()
                 .skip(skip).limit(limit)
@@ -359,7 +359,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/api/product/delete/:id', verifyToken, async (req, res) => {
+        app.delete('/api/delete/update/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = {
                 _id: new ObjectId(id)
