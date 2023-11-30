@@ -44,6 +44,7 @@ async function run() {
         const productsCollection = client.db('inventoDB').collection('products')
         const salesCollection = client.db('inventoDB').collection('sales')
         const paymentsCollection = client.db('inventoDB').collection('payments')
+        const testimonialsCollection = client.db('inventoDB').collection('testimonials')
 
 
         // >======= api middleware =======<
@@ -94,6 +95,11 @@ async function run() {
             res.send(token)
         })
 
+        // >======= testimonials api =======<
+        app.get('/api/testimonials', async (req, res) => {
+            const result = await testimonialsCollection.find().toArray()
+            res.send(result)
+        })
 
         // >======= user api =======<
         app.get('/api/users', verifyToken, verifyAdmin, async (req, res) => {
