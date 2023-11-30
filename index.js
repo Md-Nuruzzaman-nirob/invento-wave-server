@@ -13,9 +13,8 @@ const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 
 const port = process.env.PORT || 6001;
 
-// middleware
 app.use(cors({
-    origin: ["http://localhost:5173", "http://localhost:5174", "https://invento-wave-server.vercel.app", "https://invento-wave.web.app", "https://invento-wave.firebaseapp.com"],
+    origin: "*",
     credentials: true
 }));
 
@@ -98,8 +97,21 @@ async function run() {
 
         // >======= user api =======<
         app.get('/api/users', verifyToken, verifyAdmin, async (req, res) => {
-            const result = await usersCollection.find().toArray();
+            const skip = parseInt(req.query.skip) || 0
+            const limit = parseInt(req.query.limit) || 2
+
+            const result = await usersCollection.find()
+                .skip(skip).limit(limit)
+                .toArray();
             res.send(result)
+        })
+
+
+        app.get('/api/users/count', verifyToken, verifyAdmin, async (req, res) => {
+            const result = await usersCollection.estimatedDocumentCount();
+            res.send({
+                result
+            })
         })
 
         app.get('/api/user/:email', async (req, res) => {
@@ -256,13 +268,32 @@ async function run() {
 
         app.get('/api/product/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
+            const filter = req.query;
             const query = {
                 shopEmail: email,
             };
 
+            console.log(filter);
+
+            if (filter.search && filter.search !== '') {
+                const searchRegex = {
+                    $regex: filter.search,
+                    $options: 'i',
+                };
+
+                query.$or = [{
+
+                        productName: searchRegex
+                    },
+                    {
+                        productCode: searchRegex
+                    },
+                ];
+            }
+
             const result = await productsCollection.find(query).toArray();
-            res.send(result)
-        })
+            res.send(result);
+        });
 
         app.get('/api/product/id/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
